@@ -1,0 +1,542 @@
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+<script type="text/javascript" src=" https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+<script type="text/javascript" src=" https://www.2ndnewhawscouts.org.uk/osmr/vfs_fonts.js"></script>
+<script type="text/javascript" src=" https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.33/pdfmake.js"></script>
+<script type="text/javascript" src=" https://www.2ndnewhawscouts.org.uk/osmr/vfs_fonts.js"></script>
+<style>
+  #sortable { list-style-type: none; margin: 0; padding: 0; width: 60%; }
+  #sortable li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1.4em; height: 18px; }
+  #sortable li span { position: absolute; margin-left: -1.3em; }
+  .grid  {width: 142px; min-height: 200px; float: left; margin: 50px; }
+  .gridcolor1 { background: lightblue; }
+  .gridcolor2 { background: lightsalmon; }
+  .gridcolor3 { background: lightyellow; }
+  .osmr_toolbar { background: #4D2177; padding: 20px; color: white; font-family: sans-serif; }
+  .osmr_builder {font-family: sans-serif; }
+  .connectedSortable {font-family: sans-serif; font-size: 10pt; margin-left: 0px; padding-left: 0px; list-style-type: none;}
+  .connectedSortable li { padding: 3pt; margin-left: 0px;}
+  .scout { border: solid; padding: 10px; list-style-type: none; background: aliceblue; border-radius: 10px; }
+  .scout:hover { cursor: move; }
+  .extra { width: 100%; padding: 2px; }
+  .age { font-size: 8pt; text-align: right; width: 50%; display: block; float: right; }
+  .patrol { font-size: 8pt; text-align: left; width: 50%; display: block; float: left; }
+  .name {font-size: 12pt; }
+  </style>
+ <script>
+var osmrelay = "https://www.2ndnewhawscouts.org.uk/osmr/osmrelay2.php";
+var security = new Object();
+var logged_on = false;
+
+security = null;
+
+  $( function() {
+    $( "#sortable1" ).sortable({
+      items: "li:not(.ui-state-disabled)",
+      connectWith: ".connectedSortable",
+   stop: set_counts    });
+  
+    set_counts();
+    $("#osmr_loggedon").toggle();
+    $(".osmr_builder").toggle();
+    $(".section-select").change(function() {update_terms()});
+    $(".term-select").change(function() {update_events()});
+    $(".field-select").change(function() {update_field()});
+  } );
+
+function update_events() {
+var section_id = $(".section-select").val();
+var term_id = $(".term-select").val();
+url = "https://www.onlinescoutmanager.co.uk/ext/events/summary/?action=get&sectionid="+section_id+"&termid="+term_id
+do_xhr(url,update_event_list,"");
+}
+
+function update_event_list(text) {
+var event_config = JSON.parse(text);
+$(".event-select option").remove();
+$(".field-select option").remove();
+$("select.event-select").append("<option value=\"-1\">Whole Section</option>");
+for(property=0; property<event_config.items.length; property++) {
+       $("select.event-select").append("<option value=\""+event_config.items[property].eventid+"\">"+event_config.items[property].name+"</option>");
+ }
+} 
+
+function update_terms(){
+$(".term-select option").remove();
+$(".event-select option").remove();
+var section_id = $(".section-select").val();
+for(var property in terms_config[section_id]) {
+       $("select.term-select").append("<option value=\""+terms_config[section_id][property].termid+"\">"+terms_config[section_id][property].name+"</option>");
+ }
+$("select.term-select").val(terms_config[section_id][terms_config[section_id].length-1].termid);
+update_events();
+}
+  function set_counts(event, ui) {
+   var num = $(".connectedSortable").size();
+   
+   for (i=2; i<=num; i++) {
+     $("#sortable"+i+" .label").html("<b>Count:</b> "+$("#sortable"+i+" li").size());
+     var age = 0;
+     $("#sortable"+i+" li").each(function(){
+                member = members_config.data[$(this).attr("id")]; 
+                if (members_config.data.hasOwnProperty($(this).attr("id"))) {
+                age = age + 12*eval(member.age.substring(0,member.age.search("/")-1))+eval(member.age.substring(member.age.search("/")+1));
+                }
+     })
+     if ($("#sortable"+i+" li").size() > 0) {
+     age = age / $("#sortable"+i+" li").size();
+     }
+     $("#sortable"+i+" .label_age").html("<b>Average Age:</b>" + ((age-age%12)/12)+ " / " + (age%12).toFixed(0));
+   } 
+  }
+
+
+  function add_group(name) {
+    $("#sortable2 span.name").text()
+    var ok = true;
+    var num = $(".connectedSortable").size();
+    for (i=2; i<=num; i++) {
+     if($("#sortable"+i+" span.name").text()==name){
+       ok=false;
+     }
+   } 
+   if (name=="") { ok = false; };	
+   if (ok) {
+    var count = $(".grid").size() + 1;
+    var gridcol = "gridcolor" +( (count%3)+1);
+    $("body").append("<ul id='sortable"+count+"' class='connectedSortable grid "+gridcol+"'><span class=\"head\" id=\""+name+"\"><span class='name'><b>"+name+"</b></span><br><span class='label'><b>Count:</b></span><br><span class='label_age'><b>Age:</B></span><br></span></ul>");
+   $( "#sortable"+count ).sortable({
+      items: "li:not(.ui-state-disabled)",
+      connectWith: ".connectedSortable",
+      stop: set_counts
+    });
+    } else
+    {alert("You already have a Group with Name "+ $("#fname").val())} 
+  }
+
+function do_xhr_post(url,f,p) {
+var osmpath = url.substring(37,url.indexOf("?"));
+url = osmrelay +"?osmpath="+osmpath+"&"+url.substring(url.indexOf("?")+1,1000);
+
+if (security !== null ) {
+p['secret'] = security.secret;
+p['userid'] = security.userid;
+}
+
+
+var obj = $.extend({}, p);
+$.ajax({
+			url: url,
+			type: 'POST',
+			data: $.param(obj),
+			success: function(data,status){f(data);},
+                        error: function (responseData, textStatus, errorThrown) {
+        alert('POST failed.'); }
+		});
+}
+
+
+function do_xhr(url,f,p) {
+var osmpath = url.substring(37,url.indexOf("?"));
+url = osmrelay +"?osmpath="+osmpath+"&"+url.substring(url.indexOf("?")+1,1000);
+p2 = [];
+if (security !== null ) {
+p2['secret'] = security.secret;
+p2['userid'] = security.userid;
+}
+
+
+var obj = $.extend({}, p2);
+ $.post(url,$.param(obj),function(data,status){
+            f(data);
+        });
+
+}
+
+function get_sections(text) {
+
+  security = JSON.parse(text);
+  if (security.secret == null)
+  {
+    alert("Cannot Logon");
+    logged_on = false;   
+  } else
+  {
+    logged_on = true;
+  }
+
+if (($("#osmr_logon").is(":visible"))&&(logged_on==true)) { 
+$("#osmr_logon").toggle("slow");
+$("#osmr_loggedon").toggle("slow");
+}
+
+if (($("#osmr_loggedon").is(":visible"))&&(logged_on==false)) { 
+$("#osmr_loggedon").toggle("slow");
+$("#osmr_logon").toggle("slow");
+}
+if (($("#osmr_builder").is(":visible"))&&(logged_on==false)) { 
+$(".osmr_builder").toggle();
+}
+if (($("#osmr_builder").not(":visible"))&&(logged_on==true)) { 
+$(".osmr_builder").toggle();
+}
+if(logged_on==true) { 
+do_xhr('https://www.onlinescoutmanager.co.uk/api.php?action=getSectionConfig',set_sections,"");
+}
+}
+
+function set_sections(text) {
+ sections = text;
+ section_config = JSON.parse(sections);
+ do_xhr('https://www.onlinescoutmanager.co.uk/api.php?action=getTerms',set_terms,"");
+}
+
+function set_terms(text) {
+ terms = text;
+ do_xhr('https://www.onlinescoutmanager.co.uk/api.php?action=getUserRoles',set_roles,"");
+}
+
+function set_roles(text) {
+ roles = text;
+ roles_config = JSON.parse(roles);
+ terms_config = JSON.parse(terms);
+$(".section-select option").remove();
+ for(var property in section_config) {
+       $("select.section-select").append("<option value=\""+property+"\">"+roles_config[get_roles_section(property)].groupname+":"+roles_config[get_roles_section(property)].sectionname+"</option>");
+ }
+update_terms();
+}
+
+function get_roles_section(section) {
+var property;
+for(property in roles_config) {
+if (roles_config[property].sectionid == section) {
+        return property;
+    }
+}
+}
+
+function call_report() {
+ var parameters = [];
+
+  parameters['email'] = $("#username").val();
+  parameters['password'] = $("#password").val();
+do_xhr_post('https://www.onlinescoutmanager.co.uk/users.php?action=authorise',get_sections,parameters);
+
+}
+
+function make_scout(scoutid, firstname, lastname, patrol, age) {
+var scoutstring = "<li id='"+scoutid+"'><div class='scout'>"+firstname+" "+lastname+"<br><div class='extra'><span class='patrol'>"+patrol+"</span><br><span class='age'>"+age+"</span></div></li>"
+return(scoutstring);
+}
+
+
+
+function update_builder3(text) {
+event_config = JSON.parse(text);
+url = "https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers"
+parameters = [];
+parameters['section_id'] =$(".section-select").val();
+parameters['term_id'] = $(".term-select").val();
+do_xhr_post(url,update_builder2,parameters)
+}
+
+function update_builder2(text) {
+members_config = JSON.parse(text);
+$(".docs").attr("id",$(".event-select").val());
+$(".docs2").attr("id",$(".section-select").val());
+$(".docs2").text($(".section-select option:selected").text());
+
+if ( $(".event-select").val()<0) {
+$(".field-select option").remove();
+$("#sortable1").empty();
+
+
+$(".docs").text("Whole Section");
+ for (var scout in members_config.data) {
+  
+   $("#sortable1").append(make_scout(scout, members_config.data[scout].first_name, members_config.data[scout].last_name, members_config.data[scout].patrol, members_config.data[scout].age)) 
+}
+
+} else
+{
+
+$(".docs").text($(".event-select option:selected").text());
+$("#sortable1").empty();
+
+for(property=0; property<event_config.items.length; property++) {
+     if(event_config.items[property].attending=="Yes"){
+    scout = event_config.items[property].scoutid;
+   if (members_config.data.hasOwnProperty(scout)) {
+    $("#sortable1").append(make_scout( scout, event_config.items[property].firstname, event_config.items[property].lastname, members_config.data[scout].patrol, members_config.data[scout].age)) 
+   } else 
+   {
+ $("#sortable1").append(make_scout( scout, event_config.items[property].firstname, event_config.items[property].lastname, "", ""));
+   }
+ }
+//get_members_2();        
+}
+get_members_2(); 
+}
+var num = $(".connectedSortable").size();
+   for (i=2; i<=num; i++) {
+     $("#sortable"+i).remove();
+   } 
+if ( $(".event-select").val()>0) {
+url = "https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers"
+parameters = [];
+parameters['section_id'] =$(".section-select").val();
+parameters['term_id'] = $(".term-select").val();
+}
+}
+
+function get_members_2(text) {
+//members_config = JSON.parse(text);
+url = "https://www.onlinescoutmanager.co.uk/ext/events/event/?action=getStructureForEvent&eventid="+$(".event-select").val()+"&sectionid="+$(".section-select").val();
+do_xhr(url,get_event_detail,"");
+}
+
+function get_event_detail(text)
+{
+event_detail_config = JSON.parse(text);
+event_detail_config_fields = [];
+if (event_detail_config.config!="") {
+event_detail_config_fields = JSON.parse( event_detail_config.config);
+}
+$(".field-select option").remove();
+$("select.field-select").append("<option value='-1'></option>"); // Blank One
+for(property=0; property<event_detail_config_fields.length; property++) {
+ $("select.field-select").append("<option value=\""+event_detail_config_fields[property].id+"\">"+event_detail_config_fields[property].name+"</option>");
+}  
+}
+
+function update_field() {
+event_id = $(".docs").attr("id");
+field_id = $(".field-select").val();
+if (event_id>0) {
+// Clear Everything
+// add_group();
+// $(".connectedSortable #31273").appendTo("#sortable4") 
+// $(".connectedSortable #31273").appendTo(".connectedSortable .head[id='eqweq Y']")
+confirm_result = true;
+if($(".connectedSortable").size()>1) {
+  confirm_result = confirm("Clear Existing Groups");
+}
+
+if (confirm_result){
+clear_groups();
+
+for(property=0; property<event_config.items.length-1; property++) {
+     if(event_config.items[property].attending=="Yes"){
+       if (event_config.items[property][field_id]!="") {
+       if ($(".connectedSortable .head[id='"+event_config.items[property][field_id].replace(/'/g, '')+"']").size()==0) {
+         add_group(event_config.items[property][field_id].replace(/'/g, ''));
+       }
+      $(".connectedSortable #"+event_config.items[property].scoutid).appendTo(".connectedSortable .head[id='"+event_config.items[property][field_id].replace(/'/g, '')+"']")
+}
+}
+     }
+}
+}
+set_counts();
+}
+
+
+function reset_groups() {
+$(".connectedSortable li").each(function(){$(".connectedSortable #"+$(this).attr("id")).appendTo("#sortable1")})
+set_counts();
+
+}
+
+function clear_groups() {
+reset_groups();
+var num = $(".connectedSortable").size();
+for (i=2; i<=num; i++) {
+     $("#sortable"+i).remove();
+   }
+}
+
+function update_builder() {
+ok=true;
+if($(".connectedSortable").size()>1) {
+  ok=confirm("Clear Existing Groups?");
+}
+if (ok) {
+if ( $(".event-select").val()>0) {
+url="https://www.onlinescoutmanager.co.uk/ext/events/event/?action=getAttendance&eventid="+ $(".event-select").val()+"&sectionid="+ $(".section-select").val()+"&termid="+ $(".term-select").val()
+do_xhr(url,update_builder3,"");
+} else {
+url = "https://www.onlinescoutmanager.co.uk/ext/members/contact/grid/?action=getMembers"
+parameters = [];
+parameters['section_id'] =$(".section-select").val();
+parameters['term_id'] = $(".term-select").val();
+do_xhr_post(url,update_builder2,parameters)
+}
+}
+}
+
+function log_off() {
+security = null;
+$("#osmr_loggedon").toggle("slow");
+$("#osmr_logon").toggle("slow");
+$(".osmr_builder").toggle();
+var num = $(".connectedSortable").size();
+   for (i=2; i<=num; i++) {
+     $("#sortable"+i).remove();
+   }
+$(".docs").text("Make Your Selections above");
+$("#sortable1").empty();
+
+}
+
+function nothing(text)
+{
+//alert(text);
+}
+
+function update_osm()
+{
+var url = 'https://www.2ndnewhawscouts.org.uk/osmr/osmrelay.php?osmpath=ext/settings/access/&action=getAPIAccess&sectionid='+$(".docs2").attr("id");
+do_xhr(url,update_osm2,"");
+}
+function update_osm2(text) {
+rights = JSON.parse(text);
+access_ok = true;
+for (var j = 0; j < (rights.apis).length; j++)
+   {
+     if (rights.apis[j].apiid=="41") {
+        if (rights.apis[j].permissions.empty=="true")
+        {
+          access_ok = false;
+        } else
+        {
+          if (rights.apis[j].permissions.events<20) {
+            access_ok = false;
+          }
+        }
+     }
+    } 
+if (access_ok==false) {
+  alert("You have no access rights to update the event");
+} else {
+queue = new Object();
+var num = $(".connectedSortable").size();
+   for (i=2; i<=num; i++) {
+    $("#sortable"+i+" li").each(function() {queue[$(this).attr("id")] = $("#sortable"+i+" span.name").text()})     
+   }
+url = "https://www.onlinescoutmanager.co.uk/events.php?action=updateScout"
+sectionid = $(".docs2").attr("id");
+eventid = $(".docs").attr("id")
+columnid = $(".field-select").val();
+if ((eventid>0)&&(columnid!=-1)) {
+if (confirm("Update OSM with Values?")) {
+parameters = [];
+parameters['sectionid'] = sectionid;
+parameters['eventid'] = eventid;
+parameters['column'] = columnid;
+for (var property in queue) {
+parameters['scoutid'] = property;
+parameters['value'] = queue[property];
+do_xhr_post(url,nothing,parameters)
+}
+}} else
+{
+alert("You can only update Event Columns");
+}
+}
+}
+
+function print_groups() {
+  var pdf_doc = new Object;
+  pdf_doc.styles = {
+header:{
+fontSize: 18,
+			bold: true,
+			margin: [0, 0, 0, 10]
+		},
+		subheader: {
+			fontSize: 16,
+			bold: true,
+			margin: [0, 10, 0, 5]
+		},
+		tableExample: {
+			margin: [0, 5, 0, 15]
+		},
+		tableHeader: {
+			bold: true,
+			fontSize: 13,
+			color: 'black'
+		}
+	}
+  pdf_doc.defaultStyle = {
+		// alignment: 'justify'
+	} 		;
+  pdf_doc.content = [];
+  pdf_create = {};
+  pdf_create.text = $(".docs2").text();
+  pdf_create.style = "header";
+  pdf_doc.content.push(pdf_create);
+ pdf_create = {};
+  pdf_create.text = $(".docs").text();
+  pdf_create.style = "header";
+  pdf_doc.content.push(pdf_create);
+    
+  var num = $(".connectedSortable").size();
+  for (i=1; i<=num; i++) {
+    pdf_create = {}; pdf_create.text= $("#sortable"+i+" span.name").text(); 
+    if (i==1) { pdf_create.text="Not Assigned to a Group"; }
+    pdf_create.style = "subheader";
+    if ($("#sortable"+i+" li").size()>0){
+    pdf_doc.content.push(pdf_create);
+    }
+    $("#sortable"+i+" li").each(function() {scoutid = $(this).attr("id");
+    pdf_create = {};
+    pdf_create.style = "";
+    pdf_create.text = $(this).html().substring(19,$(this).html().search("<br>"));
+    pdf_doc.content.push(pdf_create);
+    })     
+   }
+   
+
+pdfMake.createPdf(pdf_doc).open(); 
+}
+
+  </script>
+</head>
+<body>
+<div class="osmr_toolbar">
+<span style="font-size:30px">Online Scout Manager Group Builder</span>
+<div id="osmr_logon"><span id="username_block">Username: <input type="text" name="username" id="username"></span>
+<span id="password_block">Password: <input type="password" name="password" id="password">
+<button type="button" onclick="call_report()" id="logon_button">Log On</button></span></div>
+<div id="osmr_loggedon">
+<button type="button" onclick="log_off()" id="logoff_button">Log Off</button>
+<span>Section: <select class="section-select"><option></option></select></span>
+<span>Term: <select class="term-select"><option></option></select></span>
+<span>Event: <select class="event-select"><option>Whole Section</option></select></span>
+<button type="button" onclick="update_builder()" id="go_button">Go!</button></span></div>
+
+</div>
+</div>
+<div class="osmr_builder">
+<div>
+<h3 class="docs2"></h3>
+<h3 class="docs">Make Your Selections above</h3><br>
+Add a New Group: <input type="text" name="fname" id="fname">
+<button type="button" onclick="add_group($('#fname').val());">Add a Group</button><br>
+<button type="button" onclick="reset_groups();">Reset Groups</button>
+<button type="button" onclick="clear_groups();">Clear Groups</button>
+<button type="button" onclick="print_groups();">Print Groups</button><br>
+<span>Field to Update: <select class="field-select"><option></option></select></span>
+<button type="button" onclick="update_osm();">Update</button>
+</div>
+<ul id="sortable1" class="connectedSortable grid gridcolor1">
+  <span class="label">Count:</span>
+  
+</ul>
+
+</div>
+</body>
+</html>
